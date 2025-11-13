@@ -1,0 +1,50 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer utilities{
+  .bg-honey {
+    background-image:
+      radial-gradient(#f6d36c 1.1px, transparent 1.2px),
+      radial-gradient(#f6d36c 1.1px, transparent 1.2px);
+    background-size: 24px 24px;
+    background-position: 0 0, 12px 12px;
+  }
+}
+
+@layer components {
+  /* Secciones */
+  .section { @apply max-w-[1200px] mx-auto px-5 py-12; }
+  .section--alt { @apply bg-amber-50/40; } /* franja crema muy sutil */
+
+  /* Títulos de sección */
+  .section-title { @apply font-display text-2xl md:text-[28px] font-extrabold tracking-tight text-borgo; }
+  .section-title .accent { @apply text-miel; }
+
+  /* Tarjetas */
+  .card { @apply bg-white border rounded-xl shadow-sm hover:shadow transition; }
+  .card--soft { @apply border-slate-200; }
+  .card-body { @apply p-5; }
+
+  /* Botones */
+  .btn { @apply inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-semibold transition; }
+  .btn-primary { @apply bg-miel text-tinta hover:brightness-110; }
+  .btn-ghost { @apply bg-white text-borgo hover:brightness-110; }
+  .btn-outline { @apply border border-borgo text-borgo hover:bg-white; }
+
+  /* Píldora de texto pequeña */
+  .pill { @apply inline-flex items-center px-2.5 py-1 rounded-full text-[12px] font-medium bg-white/70 text-borgo; }
+
+  /* Carrusel */
+  .carousel { @apply mt-4 overflow-x-auto no-scrollbar snap-x snap-mandatory; }
+  .carousel-track { @apply flex gap-6 w-max; }
+  .carousel-item { @apply shrink-0 snap-start; }
+  .carousel-nav { @apply flex gap-2; }
+  .carousel-btn { @apply w-8 h-8 grid place-items-center rounded-full border bg-white text-borgo hover:bg-slate-50; }
+
+  /* Utilidades */
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+  .bg-bee-dots { background-image: radial-gradient(rgba(255,255,255,.6) .9px, transparent .9px);
+                 background-size: 14px 14px; opacity:.18; }
+  .hero-overlay { @apply absolute inset-0 bg-gradient-to-b from-black/15 via-borgo/35 to-black/35; }
+}
