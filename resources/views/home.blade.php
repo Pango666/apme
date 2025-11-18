@@ -53,15 +53,18 @@
   </div>
 
   {{-- Indicador scroll --}}
-  <div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce">
-    <svg class="w-6 h-6 text-white/70" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
-    </svg>
-  </div>
+  <a href="#que-hacemos" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce group">
+    <div class="flex flex-col items-center">
+      <span class="text-white/70 text-sm mb-2 group-hover:text-white transition-colors">Descubre más</span>
+      <svg class="w-5 h-5 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 14l-7 7m0 0l-7-7m7 7V3"/>
+      </svg>
+    </div>
+  </a>
 </section>
 
 {{-- VALORES Y SERVICIOS --}}
-<section class="py-16 bg-white">
+<section id="que-hacemos" class="py-16 bg-white">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
       <h2 class="font-display text-3xl md:text-4xl font-bold text-borgo mb-4">Nuestro Compromiso</h2>
