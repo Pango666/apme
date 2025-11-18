@@ -25,13 +25,13 @@ class PartnerController extends Controller
     {
         $data = $r->validate([
             'name' => ['required','string','max:180'],
-            // Permitimos # o vacíos; si quieres URL real, cambia por ->nullable()->url()
+            // URL informativa; si quieres validar URL real: 'nullable','url'
             'url'  => ['nullable','string','max:255'],
             'logo' => ['nullable','image','max:5120'], // 5MB
         ]);
 
         if ($r->hasFile('logo')) {
-            $path = $r->file('logo')->store('partners', 'public'); // storage/app/public/partners/....
+            $path = $r->file('logo')->store('partners', 'public'); // partners/...
             $data['logo_path'] = "/storage/{$path}";
         }
 
@@ -50,13 +50,21 @@ class PartnerController extends Controller
     public function update(Request $r, Partner $partner)
     {
         $data = $r->validate([
-            'name' => ['required','string','max:180'],
-            'url'  => ['nullable','string','max:255'],
-            'logo' => ['nullable','image','max:5120'],
+            'name'         => ['required','string','max:180'],
+            'url'          => ['nullable','string','max:255'],
+            'logo'         => ['nullable','image','max:5120'],
+            'remove_logo'  => ['nullable','boolean'],
         ]);
 
+        // Quitar logo si se marca
+        if ($r->boolean('remove_logo') && $partner->logo_path && str_starts_with($partner->logo_path, '/storage/')) {
+            $old = str_replace('/storage/', '', $partner->logo_path);
+            Storage::disk('public')->delete($old);
+            $data['logo_path'] = null;
+        }
+
+        // Reemplazar logo si suben archivo
         if ($r->hasFile('logo')) {
-            // borrar anterior si era del storage
             if ($partner->logo_path && str_starts_with($partner->logo_path, '/storage/')) {
                 $old = str_replace('/storage/', '', $partner->logo_path);
                 Storage::disk('public')->delete($old);

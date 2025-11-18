@@ -7,8 +7,11 @@ use Illuminate\Support\Str;
 
 class Album extends Model
 {
-    protected $fillable = ['title', 'slug', 'type', 'date', 'place', 'summary'];
-    protected $casts    = ['date' => 'date'];
+    protected $fillable = ['title','slug','type','date','place','summary'];
+    protected $casts = [
+        'date'   => 'date',
+        'blocks' => 'array',
+    ];
 
     protected static function booted()
     {

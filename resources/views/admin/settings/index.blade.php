@@ -4,6 +4,7 @@
 @section('header')
   <h1 class="text-xl font-bold">Ajustes del sitio</h1>
 @endsection
+
 @section('content')
 <div class="max-w-[1100px] mx-auto px-5 py-10">
   @if(session('ok'))
@@ -28,6 +29,7 @@
 
           <label class="block text-sm mt-4 mb-1">Imagen (opcional)</label>
           <input type="file" name="hero[image]" id="heroImageInput" accept="image/*">
+          @error('hero.image')<div class="text-sm text-red-600 mt-1">{{ $message }}</div>@enderror
         </div>
 
         <div>

@@ -14,7 +14,7 @@ return new class extends Migration
         Schema::create('settings', function (Blueprint $t) {
             $t->id();
             $t->string('key')->unique();
-            $t->json('value')->nullable();
+            $t->longText('value')->nullable();
             $t->timestamps();
         });
     }

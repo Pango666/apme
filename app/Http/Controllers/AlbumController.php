@@ -8,10 +8,14 @@ class AlbumController extends Controller
 {
     public function index()
     {
-        $items = Album::withCount('photos')->latest('date')->paginate(12);
+        $items = Album::with(['photos' => fn($q) => $q->limit(1)])
+            ->latest('date')
+            ->latest('id')
+            ->paginate(12);
+
         return view('albums.index', compact('items'));
     }
-    
+
     public function show(Album $album)
     {
         $album->load('photos');

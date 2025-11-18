@@ -37,6 +37,12 @@
         <label class="block text-sm mb-1">Logo (JPG/PNG/WebP)</label>
         <input type="file" name="logo" id="logoInput" accept="image/*" class="block w-full">
         <p class="text-xs text-slate-500 mt-1">Máx. 5MB</p>
+
+        @if($partner->logo_path)
+          <label class="inline-flex items-center gap-2 mt-3">
+            <input type="checkbox" name="remove_logo" value="1"> Quitar logo
+          </label>
+        @endif
       </div>
       <div>
         <div class="text-sm text-slate-600 mb-2">Vista previa</div>

@@ -13,10 +13,11 @@ return new class extends Migration
     {
         Schema::create('pages', function (Blueprint $t) {
             $t->id();
-            $t->string('title');
-            $t->string('slug')->unique();
+            $t->string('title',190);
+            $t->string('slug',190)->unique();
             $t->text('excerpt')->nullable();
             $t->longText('body')->nullable();
+            $t->boolean('is_active')->default(true);
             $t->timestamps();
         });
     }

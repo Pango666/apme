@@ -6,16 +6,13 @@ use App\Http\Controllers\Controller;
 use App\Models\Setting;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Str;
 
 class SettingController extends Controller
 {
     public function index()
     {
-        // No usar pluck para respetar casts
-        $map = Setting::all()
-            ->mapWithKeys(fn ($s) => [$s->key => $s->value])
-            ->toArray();
+        // Trae todo como pares clave => valor (decodifica si hay JSON válido)
+        $map = Setting::allPairs();
 
         $hero = [
             'title'    => $map['hero.title']    ?? 'Miel justa de nuestras comunidades',
@@ -23,7 +20,7 @@ class SettingController extends Controller
             'image'    => $map['hero.image']    ?? null,
         ];
 
-        // Normaliza preview
+        // Normaliza preview (si es ruta interna => Storage::url)
         if (!empty($hero['image']) && !str_starts_with($hero['image'], 'http') && !str_starts_with($hero['image'], '/')) {
             $hero['image'] = Storage::url($hero['image']);
         }
@@ -45,35 +42,37 @@ class SettingController extends Controller
 
     /**
      * PUT /admin/settings/{any}
-     * (las rutas NO cambian, usas la tuya)
+     * Nota: la firma acepta $any para calzar con tu ruta, aunque no se usa.
      */
-    public function update(Request $request)
+    public function update(Request $request, $any = null)
     {
-        $data = $request->all();
+        $request->validate([
+            'hero.title'       => ['nullable','string','max:255'],
+            'hero.subtitle'    => ['nullable','string','max:255'],
+            'hero.image'       => ['nullable','image'],
+            'contact.whatsapp' => ['nullable','string','max:100'],
+            'contact.email'    => ['nullable','email','max:150'],
+            'contact.address'  => ['nullable','string','max:255'],
+            'social.facebook'  => ['nullable','url'],
+            'social.instagram' => ['nullable','url'],
+            'social.tiktok'    => ['nullable','url'],
+        ]);
 
-        // ---------------- HERO ----------------
-        if (isset($data['hero']['title'])) {
-            Setting::updateOrCreate(['key' => 'hero.title'],    ['value' => (string) $data['hero']['title']]);
-        }
-        if (isset($data['hero']['subtitle'])) {
-            Setting::updateOrCreate(['key' => 'hero.subtitle'], ['value' => (string) $data['hero']['subtitle']]);
-        }
+        // Texto simple
+        Setting::set('hero.title',        $request->input('hero.title'));
+        Setting::set('hero.subtitle',     $request->input('hero.subtitle'));
+        Setting::set('contact.whatsapp',  $request->input('contact.whatsapp'));
+        Setting::set('contact.email',     $request->input('contact.email'));
+        Setting::set('contact.address',   $request->input('contact.address'));
+        Setting::set('social.facebook',   $request->input('social.facebook'));
+        Setting::set('social.instagram',  $request->input('social.instagram'));
+        Setting::set('social.tiktok',     $request->input('social.tiktok'));
 
-        // Imagen (opcional)
+        // Imagen (guardar SOLO path relativo; la vista/home lo resolverán con Storage::url)
         if ($request->hasFile('hero.image')) {
-            $path = $request->file('hero.image')->store('hero', 'public'); // hero/xxx.jpg
-            Setting::updateOrCreate(['key' => 'hero.image'], ['value' => $path]);
+            $path = $request->file('hero.image')->store('hero', 'public'); // p.ej. hero/abc.jpg
+            Setting::set('hero.image', $path);
         }
-
-        // ---------------- CONTACT ----------------
-        Setting::updateOrCreate(['key' => 'contact.whatsapp'], ['value' => (string)($data['contact']['whatsapp'] ?? '')]);
-        Setting::updateOrCreate(['key' => 'contact.email'],    ['value' => (string)($data['contact']['email']    ?? '')]);
-        Setting::updateOrCreate(['key' => 'contact.address'],  ['value' => (string)($data['contact']['address']  ?? '')]);
-
-        // ---------------- SOCIAL ----------------
-        Setting::updateOrCreate(['key' => 'social.facebook'],  ['value' => (string)($data['social']['facebook']  ?? '')]);
-        Setting::updateOrCreate(['key' => 'social.instagram'], ['value' => (string)($data['social']['instagram'] ?? '')]);
-        Setting::updateOrCreate(['key' => 'social.tiktok'],    ['value' => (string)($data['social']['tiktok']    ?? '')]);
 
         return back()->with('ok', 'Ajustes guardados.');
     }

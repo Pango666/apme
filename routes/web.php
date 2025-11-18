@@ -29,6 +29,14 @@ Route::get('/pages/{slug}', [PageController::class, 'show'])->name('page.show');
 Route::get('/comunidades', [CommunityController::class, 'index'])->name('comunidades.index');
 Route::get('/comunidades/{community:slug}', [CommunityController::class, 'show'])->name('comunidades.show');
 
+// Pestañas/Secciones dentro de una comunidad
+Route::prefix('/comunidades/{community:slug}')->name('comunidad.')->group(function () {
+    Route::get('/productos',     [CommunityController::class, 'products'])->name('productos');
+    Route::get('/que-hacemos',   [CommunityController::class, 'whatWeDo'])->name('whatwedo');
+    Route::get('/involucrate',   [CommunityController::class, 'takeAction'])->name('takeaction');
+    Route::get('/donar',         [CommunityController::class, 'donate'])->name('donate');
+});
+
 // Productos
 Route::get('/productos', [ProductController::class, 'index'])->name('productos.index');
 Route::get('/productos/{product:slug}', [ProductController::class, 'show'])->name('productos.show');
