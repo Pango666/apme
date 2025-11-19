@@ -3,8 +3,12 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendCampaignJob;
 use App\Models\Album;
 use App\Models\AlbumPhoto;
+use App\Models\Campaign;
+use App\Models\CampaignRecipient;
+use App\Models\NewsletterSubscriber;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -55,6 +59,58 @@ class AlbumController extends Controller
                 }
             }
         });
+
+        /** ------- ENVÍO OPCIONAL DE BOLETÍN ------- */
+        if ($r->boolean('send_to_newsletter')) {
+            // Datos base del álbum
+            $title = $album->title;
+            $url   = route('albums.show', $album->slug);
+
+            // Portada: 1) campo cover_path si lo tuvieras; 2) primera foto del álbum; 3) placeholder
+            $firstPhoto = $album->photos()->orderBy('order')->value('path'); // string|null
+            $cover = $album->cover_path ?? $firstPhoto ?? '/placeholder.webp';
+
+            // Texto breve para el correo (usa summary si hay; si no, arma algo corto con lugar y fecha)
+            $excerpt = trim($album->summary ?: implode(' · ', array_filter([
+                $album->place,
+                optional($album->date)->format('d/m/Y')
+            ])));
+
+            // Render del HTML usando la misma plantilla
+            $html = view('emails.templates.content-publish', [
+                'title'   => $title,
+                'excerpt' => $excerpt,
+                'url'     => $url,
+                'cover'   => $cover,
+            ])->render();
+
+            // Crear campaña
+            $c = \App\Models\Campaign::create([
+                'name'         => 'Auto · ' . $title,
+                'subject'      => 'Nuevo: ' . $title,
+                'preheader'    => 'Conoce la novedad de APME',
+                'html'         => $html,
+                'status'       => 'sending',
+                'scheduled_at' => now(),
+                'sent_count'   => 0,
+                'error_count'  => 0,
+            ]);
+
+            // Recipientes: solo suscritos confirmados
+            $subs = \App\Models\NewsletterSubscriber::where('status', 'subscribed')
+                ->get(['id', 'email']);
+
+            foreach ($subs as $s) {
+                \App\Models\CampaignRecipient::updateOrCreate(
+                    ['campaign_id' => $c->id, 'subscriber_id' => $s->id],
+                    ['email' => $s->email, 'status' => 'queued', 'error' => null, 'sent_at' => null]
+                );
+            }
+
+            // Despachar job
+            dispatch(new \App\Jobs\SendCampaignJob($c->id));
+        }
+        /** ------------------------------------------ */
 
         return redirect()->route('admin.albums.edit', $album)->with('ok', 'Creado');
     }

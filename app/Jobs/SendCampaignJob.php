@@ -4,73 +4,107 @@ namespace App\Jobs;
 
 use App\Models\Campaign;
 use App\Models\CampaignRecipient;
-use App\Models\NewsletterSubscriber;
+use App\Mail\CampaignMailable;
+use Illuminate\Bus\Queueable;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Contracts\Queue\ShouldQueue;
-use Illuminate\Foundation\Bus\Dispatchable;
-use Illuminate\Foundation\Queue\Queueable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Mail;
+use Throwable;
 
 class SendCampaignJob implements ShouldQueue
 {
-    use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+    use InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 1200; // 20 min
+    public int $campaignId;
 
-    public function __construct(public int $campaignId) {}
+    /**
+     * @param  int  $campaignId
+     */
+    public function __construct(int $campaignId)
+    {
+        $this->onQueue('mail');
+        $this->campaignId = $campaignId;
+    }
 
     public function handle(): void
     {
-        $campaign = Campaign::findOrFail($this->campaignId);
-
-        // Cola de envío (throttle simple)
-        $chunk = 100;            // envíos por tanda
-        $sleepMs = 1200;         // ~50–60/min para SMTP free
-        $query = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'queued');
-
-        $query->chunkById($chunk, function ($batch) use ($campaign, $sleepMs) {
-            foreach ($batch as $r) {
-                // saltar si el suscriptor ya se dio de baja
-                $sub = NewsletterSubscriber::find($r->subscriber_id);
-                if (!$sub || $sub->status !== 'subscribed') {
-                    $r->update(['status' => 'failed', 'error' => 'not subscribed']);
-                    $campaign->increment('error_count');
-                    continue;
-                }
-
-                try {
-                    // Personalización mínima
-                    $html = $campaign->html;
-                    $unsubscribe = route('newsletter.unsubscribe', $sub->token);
-                    $html = str_replace('{{unsubscribe_url}}', $unsubscribe, $html);
-
-                    Mail::send([], [], function ($m) use ($campaign, $r, $html) {
-                        $m->to($r->email)
-                            ->subject($campaign->subject)
-                            ->html($html);
-                        if ($campaign->preheader) {
-                            $m->withSwiftMessage(function ($message) use ($campaign) {
-                                $headers = $message->getHeaders();
-                                $headers->addTextHeader('X-Preheader', $campaign->preheader);
-                            });
-                        }
-                    });
-
-                    $r->update(['status' => 'sent', 'sent_at' => now(), 'error' => null]);
-                    $campaign->increment('sent_count');
-                } catch (\Throwable $e) {
-                    $r->update(['status' => 'failed', 'error' => substr($e->getMessage(), 0, 500)]);
-                    $campaign->increment('error_count');
-                }
-
-                usleep($sleepMs * 1000);
-            }
-        });
-
-        // Cerrar campaña
-        if (!CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'queued')->exists()) {
-            $campaign->update(['status' => 'sent']);
+        $campaign = Campaign::find($this->campaignId);
+        if (!$campaign) {
+            Log::warning("[SendCampaignJob] Campaña no encontrada id={$this->campaignId}");
+            return;
         }
+
+        // Tomamos solo los "queued"
+        $total = CampaignRecipient::where('campaign_id', $campaign->id)
+            ->where('status', 'queued')
+            ->count();
+
+        Log::info("[SendCampaignJob] Iniciando envío campaña={$campaign->id} recipients={$total}");
+
+        if ($total === 0) {
+            // Si no hay queued, inferimos estado
+            $sent   = CampaignRecipient::where('campaign_id',$campaign->id)->where('status','sent')->count();
+            $failed = CampaignRecipient::where('campaign_id',$campaign->id)->where('status','failed')->count();
+            $campaign->status      = $sent > 0 && $failed === 0 ? 'sent' : ($sent > 0 ? 'partial' : 'empty');
+            $campaign->sent_count  = $sent;
+            $campaign->error_count = $failed;
+            $campaign->save();
+            Log::info("[SendCampaignJob] Final campaña={$campaign->id} status={$campaign->status} sent={$sent} failed={$failed}");
+            return;
+        }
+
+        $sentCount  = 0;
+        $errorCount = 0;
+
+        CampaignRecipient::where('campaign_id', $campaign->id)
+            ->where('status', 'queued')
+            ->orderBy('id')
+            ->chunkById(100, function ($chunk) use ($campaign, &$sentCount, &$errorCount) {
+                foreach ($chunk as $r) {
+                    /** @var \App\Models\CampaignRecipient $r */
+                    Log::info("[SendCampaignJob] Enviando a {$r->email} (recipient_id={$r->id})");
+
+                    try {
+                        Mail::to($r->email)->send(new CampaignMailable(
+                            $campaign->subject,
+                            $campaign->html,
+                            $campaign->preheader
+                        ));
+
+                        // Si no explotó, lo marcamos como enviado
+                        $r->status   = 'sent';
+                        $r->sent_at  = now();
+                        $r->error    = null;
+                        $r->save();
+
+                        $sentCount++;
+                    } catch (Throwable $e) {
+                        Log::error("[SendCampaignJob] Error enviando a {$r->email}: ".$e->getMessage());
+                        $r->status = 'failed';
+                        $r->error  = substr($e->getMessage(), 0, 500);
+                        $r->save();
+                        $errorCount++;
+                    }
+                }
+            });
+
+        // Consolidar estado de la campaña
+        $totalRecipients = CampaignRecipient::where('campaign_id', $campaign->id)->count();
+        $campaign->sent_count  = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'sent')->count();
+        $campaign->error_count = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'failed')->count();
+
+        if ($campaign->sent_count === $totalRecipients) {
+            $campaign->status = 'sent';
+        } elseif ($campaign->sent_count > 0) {
+            $campaign->status = 'partial';
+        } else {
+            $campaign->status = 'failed';
+        }
+
+        $campaign->save();
+
+        Log::info("[SendCampaignJob] Final campaña={$campaign->id} status={$campaign->status} sent+={$sentCount} errors+={$errorCount} total_sent={$campaign->sent_count} total_err={$campaign->error_count}");
     }
 }

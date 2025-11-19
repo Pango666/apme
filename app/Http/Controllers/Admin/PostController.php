@@ -3,8 +3,13 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Http\Controllers\Controller;
+use App\Jobs\SendCampaignJob;
+use App\Models\Campaign;
+use App\Models\CampaignRecipient;
+use App\Models\NewsletterSubscriber;
 use App\Models\Post;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Facades\Storage;
@@ -52,6 +57,44 @@ class PostController extends Controller
         }
 
         $post = Post::create($data);
+
+        /** ------- ENVÍO OPCIONAL DE BOLETÍN ------- */
+        if ($r->boolean('send_to_newsletter')) {
+            $title = $post->title;
+            $url   = route('noticias.show', $post->slug);
+            $cover = $post->cover_path ?: '/placeholder.webp';
+
+            $html = view('emails.templates.content-publish', [
+                'title'   => $title,
+                'excerpt' => $post->excerpt,
+                'url'     => $url,
+                'cover'   => $cover,
+            ])->render();
+
+            $c = Campaign::create([
+                'name'        => 'Auto · ' . $title,
+                'subject'     => 'Nuevo: ' . $title,
+                'preheader'   => 'Conoce la novedad de APME',
+                'html'        => $html,
+                'status'      => 'sending',
+                'scheduled_at' => now(),
+                'sent_count'  => 0,
+                'error_count' => 0,
+            ]);
+
+            // Solo suscriptores confirmados
+            $subs = NewsletterSubscriber::where('status', 'subscribed')->get(['id', 'email']);
+
+            foreach ($subs as $s) {
+                CampaignRecipient::updateOrCreate(
+                    ['campaign_id' => $c->id, 'subscriber_id' => $s->id],
+                    ['email' => $s->email, 'status' => 'queued', 'error' => null, 'sent_at' => null]
+                );
+            }
+
+            dispatch(new SendCampaignJob($c->id));
+        }
+        /** ------------------------------------------ */
 
         return redirect()->route('admin.posts.edit', $post)->with('ok', 'Creado');
     }

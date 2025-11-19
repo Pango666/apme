@@ -82,11 +82,18 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::resource('partners',    AdminPartnerController::class);
 
     // Newsletter for Admin
-    Route::prefix('newsletter')->name('newsletter.')->group(function () {
-        Route::resource('subscribers', SubscriberController::class)->only(['index', 'destroy']);
-        Route::resource('campaigns',   CampaignController::class);
-        Route::post('campaigns/{campaign}/send-now', [CampaignController::class, 'sendNow'])->name('campaigns.send');
-    });
+    Route::get('newsletter', [\App\Http\Controllers\Admin\NewsletterController::class, 'index'])
+        ->name('newsletter.index');
+
+    // Campañas (listado + crear rápido + enviar + resincronizar)
+    Route::get('campaigns', [\App\Http\Controllers\Admin\CampaignController::class, 'index'])
+        ->name('campaigns.index');
+    Route::post('campaigns', [\App\Http\Controllers\Admin\CampaignController::class, 'store'])
+        ->name('campaigns.store');
+    Route::post('campaigns/{campaign}/send', [\App\Http\Controllers\Admin\CampaignController::class, 'send'])
+        ->name('campaigns.send');
+    Route::post('campaigns/{campaign}/sync', [\App\Http\Controllers\Admin\CampaignController::class, 'sync'])
+        ->name('campaigns.sync');
 });
 
 require __DIR__ . '/auth.php';

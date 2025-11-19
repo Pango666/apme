@@ -3,20 +3,30 @@
 
 @section('content')
 @php
-  $settings  = $settings ?? [];
-  $hero      = $hero ?? [];
-  $heroTitle = $hero['title']    ?? ($settings['hero.title']    ?? 'Miel ecológica de nuestras comunidades');
-  $heroSub   = $hero['subtitle'] ?? ($settings['hero.subtitle'] ?? 'Trazabilidad, calidad y comercio justo desde Bolivia');
-  $heroImg   = $hero['image']    ?? ($settings['hero.image']    ?? null);
+  // --- FIX: decodificador real de \uXXXX ---
+  $unesc = function ($v) {
+      if (!is_string($v) || !str_contains($v, '\u')) return $v;
+      return preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function ($m) {
+          $code = hexdec($m[1]);
+          return iconv('UCS-2BE', 'UTF-8', pack('n', $code));
+      }, $v);
+  };
+
+  $settings   = $settings ?? [];
+  $hero       = $hero ?? [];
+
+  $heroTitle  = $unesc($hero['title']    ?? ($settings['hero.title']    ?? 'Miel ecológica de nuestras comunidades'));
+  $heroSub    = $unesc($hero['subtitle'] ?? ($settings['hero.subtitle'] ?? 'Trazabilidad, calidad y comercio justo desde Bolivia'));
+  $heroImg    =        $hero['image']    ?? ($settings['hero.image']    ?? null);
 
   if ($heroImg && !preg_match('#^(https?://|/)#', $heroImg)) {
       $heroImg = \Illuminate\Support\Facades\Storage::url($heroImg);
   }
   $heroImg = $heroImg ?: '/hero-miel.webp';
 
-  $qs        = $qs        ?? null;
-  $mision    = $mision    ?? null;
-  $vision    = $vision    ?? null;
+  $qs          = $qs          ?? null;
+  $mision      = $mision      ?? null;
+  $vision      = $vision      ?? null;
   $comunidades = ($comunidades ?? collect())->sortByDesc('id')->take(6);
   $productos   = ($productos   ?? collect())->sortByDesc('id')->take(8);
   $ferias      = ($ferias      ?? collect())->sortByDesc('date')->take(5);
@@ -24,7 +34,7 @@
   $partners    = ($partners    ?? collect())->take(8);
 @endphp
 
-{{-- HERO SECTION MEJORADA --}}
+{{-- HERO --}}
 <section class="relative w-full min-h-[85vh] flex items-center justify-center overflow-hidden bg-gradient-to-br from-borgo/95 to-borgo2">
   <div class="absolute inset-0">
     <img src="{{ $heroImg }}" alt="Producción de miel ecológica APME" class="w-full h-full object-cover opacity-40">
@@ -36,15 +46,15 @@
       <h1 class="font-display text-4xl md:text-6xl lg:text-7xl font-bold leading-tight mb-6 animate-fade-in">
         {{ $heroTitle }}
       </h1>
-      <p class="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed animate-fade-in" style="animation-delay: 0.2s">
+      <p class="text-xl md:text-2xl text-white/90 mb-8 max-w-3xl mx-auto leading-relaxed animate-fade-in" style="animation-delay: .2s">
         {{ $heroSub }}
       </p>
-      <div class="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in" style="animation-delay: 0.4s">
-        <a href="{{ route('productos.index') }}" 
+      <div class="flex flex-col sm:flex-row gap-4 justify-center items-center animate-fade-in" style="animation-delay: .4s">
+        <a href="{{ route('productos.index') }}"
            class="bg-gradient-to-r from-miel to-ambar text-tinta font-semibold px-8 py-4 rounded-full hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 text-lg">
           Descubrir Productos
         </a>
-        <a href="{{ route('page.show','quienes-somos') }}" 
+        <a href="{{ route('page.show','quienes-somos') }}"
            class="border-2 border-white text-white font-semibold px-8 py-4 rounded-full hover:bg-white hover:text-borgo transition-all duration-300 text-lg">
           Conocer APME
         </a>
@@ -52,8 +62,7 @@
     </div>
   </div>
 
-  {{-- Indicador scroll --}}
-  <a href="#que-hacemos" class="absolute bottom-8 left-1/2 transform -translate-x-1/2 animate-bounce group">
+  <a href="#que-hacemos" class="absolute bottom-8 left-1/2 -translate-x-1/2 animate-bounce group">
     <div class="flex flex-col items-center">
       <span class="text-white/70 text-sm mb-2 group-hover:text-white transition-colors">Descubre más</span>
       <svg class="w-5 h-5 text-white/70 group-hover:text-white transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -63,7 +72,7 @@
   </a>
 </section>
 
-{{-- VALORES Y SERVICIOS --}}
+{{-- VALORES --}}
 <section id="que-hacemos" class="py-16 bg-white">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
@@ -72,7 +81,6 @@
     </div>
 
     <div class="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
-      {{-- Calidad --}}
       <div class="text-center group" data-aos="fade-up">
         <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-miel/20 to-ambar/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
           <svg class="w-10 h-10 text-borgo" fill="currentColor" viewBox="0 0 24 24"><path d="m18 7-1.4-1.4-6.6 6.6-2.6-2.6L6 11l4 4 8-8Zm-6-5a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Z"/></svg>
@@ -81,7 +89,6 @@
         <p class="text-slate-600 text-sm leading-relaxed">Estrictos controles de calidad y trazabilidad desde la colmena hasta el consumidor final</p>
       </div>
 
-      {{-- Sostenibilidad --}}
       <div class="text-center group" data-aos="fade-up" data-aos-delay="100">
         <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-hoja/20 to-green-600/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
           <svg class="w-10 h-10 text-hoja" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-8-3Zm0 2.2 6 2.3v3.3l-6-2.3-6 2.3V6.5l6-2.3ZM6 7.5l4.1 1.5L6 10.5V7.5Zm12 0v3l-4.1-1.5L18 7.5Z"/></svg>
@@ -90,7 +97,6 @@
         <p class="text-slate-600 text-sm leading-relaxed">Prácticas apícolas responsables que protegen la biodiversidad y los ecosistemas locales</p>
       </div>
 
-      {{-- Comunidades --}}
       <div class="text-center group" data-aos="fade-up" data-aos-delay="200">
         <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-borgo/20 to-purple-600/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
           <svg class="w-10 h-10 text-borgo" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.2 0 4-1.8 4-4s-1.8-4-4-4-4 1.8-4 4 1.8 4 4 4Zm0 2c-2.7 0-8 1.3-8 4v2h16v-2c0-2.7-5.3-4-8-4Z"/></svg>
@@ -99,7 +105,6 @@
         <p class="text-slate-600 text-sm leading-relaxed">Fortalecemos las capacidades de productores locales mediante formación y acceso a mercados</p>
       </div>
 
-      {{-- Comercio Justo --}}
       <div class="text-center group" data-aos="fade-up" data-aos-delay="300">
         <div class="w-20 h-20 mx-auto mb-6 bg-gradient-to-br from-ambar/20 to-orange-500/20 rounded-2xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
           <svg class="w-10 h-10 text-ambar" fill="currentColor" viewBox="0 0 24 24"><path d="M11 9h2V7h-2v2Zm1 11c-4.4 0-8-3.6-8-8s3.6-8 8-8 8 3.6 8 8-3.6 8-8 8Zm0-18C6.5 2 2 6.5 2 12s4.5 10 10 10 10-4.5 10-10S17.5 2 12 2Zm-1 15h2v-6h-2v6Z"/></svg>
@@ -122,7 +127,7 @@
         <p class="text-lg text-slate-700 mb-6 leading-relaxed">
           La Asociación de Productores de Miel Ecológica (APME) representa el esfuerzo colectivo de apicultores comprometidos con la calidad, trazabilidad y sostenibilidad de la producción apícola en Bolivia.
         </p>
-        
+
         <div class="space-y-4 mb-8">
           <div class="flex items-start space-x-3">
             <svg class="w-6 h-6 text-miel flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="m10 16.4-4-4L7.4 11l2.6 2.6L16.6 7 18 8.4l-8 8Z"/></svg>
@@ -148,11 +153,11 @@
         </div>
 
         <div class="flex flex-wrap gap-4">
-          <a href="{{ route('page.show','quienes-somos') }}" 
+          <a href="{{ route('page.show','quienes-somos') }}"
              class="bg-gradient-to-r from-borgo to-borgo2 text-white font-semibold px-6 py-3 rounded-full hover:shadow-lg transition-all">
             Conocer Nuestra Historia
           </a>
-          <a href="{{ route('contacto') }}" 
+          <a href="{{ route('contacto') }}"
              class="border-2 border-borgo text-borgo font-semibold px-6 py-3 rounded-full hover:bg-borgo hover:text-white transition-all">
             Unirse a APME
           </a>
@@ -178,8 +183,7 @@
             </div>
           </div>
         </div>
-        
-        {{-- Elemento decorativo --}}
+
         <div class="absolute -bottom-6 -left-6 w-24 h-24 bg-miel/20 rounded-full blur-xl"></div>
         <div class="absolute -top-6 -right-6 w-32 h-32 bg-borgo/10 rounded-full blur-xl"></div>
       </div>
@@ -187,7 +191,7 @@
   </div>
 </section>
 
-{{-- COMUNIDADES PRODUCTORAS --}}
+{{-- COMUNIDADES --}}
 <section class="py-16 bg-white">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
@@ -195,7 +199,7 @@
         <h2 class="font-display text-3xl font-bold text-borgo mb-2">Comunidades Productoras</h2>
         <p class="text-slate-600 max-w-2xl">Conoce las comunidades que trabajan con nosotros en la producción de miel ecológica de calidad</p>
       </div>
-      <a href="{{ route('comunidades.index') }}" 
+      <a href="{{ route('comunidades.index') }}"
          class="mt-4 md:mt-0 inline-flex items-center text-borgo font-semibold hover:text-borgo2 transition-colors">
         Ver todas las comunidades
         <svg class="w-4 h-4 ml-2" fill="currentColor" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41Z"/></svg>
@@ -211,7 +215,7 @@
           <div class="p-6">
             <h3 class="font-semibold text-lg text-borgo mb-2 group-hover:text-borgo2 transition-colors">{{ $comunidad->name }}</h3>
             <p class="text-slate-600 text-sm mb-4">{{ $comunidad->province }}</p>
-            <a href="{{ route('comunidades.show', $comunidad->slug) }}" 
+            <a href="{{ route('comunidades.show', $comunidad->slug) }}"
                class="inline-flex items-center text-sm font-medium text-miel hover:text-ambar transition-colors">
               Conocer más
               <svg class="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41Z"/></svg>
@@ -228,7 +232,7 @@
   </div>
 </section>
 
-{{-- PRODUCTOS DESTACADOS --}}
+{{-- PRODUCTOS --}}
 <section class="py-16 bg-gradient-to-br from-borgo to-borgo2 text-white">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
@@ -247,7 +251,7 @@
           @if($producto->price_bs)
             <div class="text-miel font-bold text-lg">{{ number_format($producto->price_bs, 2) }} Bs</div>
           @endif
-          <a href="{{ route('productos.show', $producto) }}" 
+          <a href="{{ route('productos.show', $producto->slug ?? $producto) }}"
              class="inline-flex items-center text-sm font-medium text-white hover:text-miel transition-colors mt-4">
             Ver detalles
             <svg class="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41Z"/></svg>
@@ -262,7 +266,7 @@
     </div>
 
     <div class="text-center mt-12">
-      <a href="{{ route('productos.index') }}" 
+      <a href="{{ route('productos.index') }}"
          class="bg-white text-borgo font-semibold px-8 py-4 rounded-full hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300 inline-flex items-center">
         Explorar Catálogo Completo
         <svg class="w-5 h-5 ml-2" fill="currentColor" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41Z"/></svg>
@@ -271,7 +275,7 @@
   </div>
 </section>
 
-{{-- NOTICIAS Y ACTUALIDAD --}}
+{{-- NOTICIAS --}}
 <section class="py-16 bg-white">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
@@ -279,7 +283,7 @@
         <h2 class="font-display text-3xl font-bold text-borgo mb-2">Noticias y Actualidad</h2>
         <p class="text-slate-600 max-w-2xl">Mantente informado sobre nuestras actividades, eventos y novedades del sector apícola</p>
       </div>
-      <a href="{{ route('noticias.index') }}" 
+      <a href="{{ route('noticias.index') }}"
          class="mt-4 md:mt-0 inline-flex items-center text-borgo font-semibold hover:text-borgo2 transition-colors">
         Ver todas las noticias
         <svg class="w-4 h-4 ml-2" fill="currentColor" viewBox="0 0 24 24"><path d="M8.59 16.59 13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41Z"/></svg>
@@ -290,8 +294,8 @@
       @forelse($posts as $post)
         <article class="bg-white rounded-xl shadow-card border border-slate-100 overflow-hidden hover:shadow-lg transition-all duration-300 group" data-aos="fade-up">
           <div class="aspect-video bg-gradient-to-br from-borgo/10 to-miel/10 overflow-hidden">
-            <img src="{{ $post->cover_path ?? '/placeholder.webp' }}" 
-                 alt="{{ $post->title }}" 
+            <img src="{{ $post->cover_path ?? '/placeholder.webp' }}"
+                 alt="{{ $post->title }}"
                  class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
           </div>
           <div class="p-6">
@@ -301,7 +305,7 @@
               <span class="text-sm text-slate-500">
                 {{ $post->published_at ? \Illuminate\Support\Carbon::parse($post->published_at)->isoFormat('D MMM YYYY') : 'Próximamente' }}
               </span>
-              <a href="{{ route('noticias.show', $post->slug) }}" 
+              <a href="{{ route('noticias.show', $post->slug) }}"
                  class="text-sm font-medium text-miel hover:text-ambar transition-colors">
                 Leer más
               </a>
@@ -318,7 +322,7 @@
   </div>
 </section>
 
-{{-- ALIADOS ESTRATÉGICOS --}}
+{{-- ALIADOS --}}
 <section class="py-16 bg-crema/50">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
     <div class="text-center mb-12">
@@ -329,14 +333,14 @@
     <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
       @forelse($partners as $partner)
         <div class="bg-white rounded-xl p-6 border border-slate-200 hover:shadow-md transition-all duration-300 flex items-center justify-center h-32" data-aos="fade-up">
-          <img src="{{ $partner->logo_path ?? '/placeholder.webp' }}" 
-               alt="{{ $partner->name }}" 
+          <img src="{{ $partner->logo_path ?? '/placeholder.webp' }}"
+               alt="{{ $partner->name }}"
                class="max-h-12 object-contain opacity-70 hover:opacity-100 transition-opacity">
         </div>
       @empty
         <div class="col-span-4 text-center py-8">
           <div class="grid grid-cols-2 md:grid-cols-4 gap-8 opacity-40">
-            @for($i = 0; $i < 4; $i++)
+            @for($i=0;$i<4;$i++)
               <div class="bg-white rounded-xl p-6 border border-slate-200 flex items-center justify-center h-32">
                 <div class="w-20 h-8 bg-slate-200 rounded"></div>
               </div>
@@ -359,11 +363,11 @@
       Únete a nuestra asociación, conviértete en proveedor o descubre cómo puedes apoyar la apicultura sostenible
     </p>
     <div class="flex flex-col sm:flex-row gap-4 justify-center" data-aos="fade-up" data-aos-delay="200">
-      <a href="{{ route('contacto') }}" 
+      <a href="{{ route('contacto') }}"
          class="bg-white text-borgo font-semibold px-8 py-4 rounded-full hover:shadow-lg transform hover:-translate-y-1 transition-all duration-300">
         Contactar APME
       </a>
-      <a href="{{ route('productos.index') }}" 
+      <a href="{{ route('productos.index') }}"
          class="border-2 border-white text-white font-semibold px-8 py-4 rounded-full hover:bg-white hover:text-borgo transition-all duration-300">
         Ver Productos
       </a>
@@ -371,58 +375,48 @@
   </div>
 </section>
 
+{{-- TOAST boletín (lee flashes de sesión puestos por el controlador del newsletter) --}}
+@if(session('newsletter_ok') || session('newsletter_err'))
+  @php
+    $toastText = session('newsletter_ok') ?? session('newsletter_err');
+    $toastOk   = session()->has('newsletter_ok');
+  @endphp
+  <div id="apme-toast"
+       class="fixed bottom-6 right-6 z-50 max-w-sm rounded-xl border px-4 py-3 shadow-lg
+              {{ $toastOk ? 'bg-white border-green-200' : 'bg-white border-red-200' }}">
+    <div class="flex items-start gap-3">
+      <svg class="w-5 h-5 mt-0.5 {{ $toastOk ? 'text-green-600' : 'text-red-600' }}" fill="currentColor" viewBox="0 0 24 24">
+        @if($toastOk)
+          <path d="m10 16.4-4-4L7.4 11l2.6 2.6L16.6 7 18 8.4l-8 8Z"/>
+        @else
+          <path d="M11 15h2v2h-2v-2Zm0-8h2v6h-2V7Zm1-5a10 10 0 1 0 .001 20.001A10 10 0 0 0 12 2Z"/>
+        @endif
+      </svg>
+      <div class="text-sm text-slate-800">{{ $toastText }}</div>
+      <button onclick="document.getElementById('apme-toast')?.remove()" class="ml-auto text-slate-400 hover:text-slate-600">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18 18 6M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+  <script> setTimeout(()=>document.getElementById('apme-toast')?.remove(), 4500); </script>
+@endif
+
 <style>
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(30px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  @keyframes slideUp {
-    from { opacity: 0; transform: translateY(40px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.8s ease-out forwards;
-  }
-  
-  .line-clamp-2 {
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  
-  .line-clamp-3 {
-    display: -webkit-box;
-    -webkit-line-clamp: 3;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
+  @keyframes fadeIn { from {opacity:0; transform: translateY(30px);} to {opacity:1; transform: translateY(0);} }
+  .animate-fade-in { animation: fadeIn .8s ease-out forwards; }
+  .line-clamp-2 { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+  .line-clamp-3 { display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden; }
 </style>
 
 <script>
   document.addEventListener('DOMContentLoaded', function() {
-    // Inicializar AOS si está disponible
     if (typeof AOS !== 'undefined') {
-      AOS.init({
-        duration: 800,
-        once: true,
-        offset: 100
-      });
+      AOS.init({ duration: 800, once: true, offset: 100 });
     }
-    
-    // Smooth scroll para enlaces internos
-    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
-      anchor.addEventListener('click', function (e) {
-        e.preventDefault();
-        const target = document.querySelector(this.getAttribute('href'));
-        if (target) {
-          target.scrollIntoView({
-            behavior: 'smooth',
-            block: 'start'
-          });
-        }
+    document.querySelectorAll('a[href^="#"]').forEach(a=>{
+      a.addEventListener('click',e=>{
+        const t = document.querySelector(a.getAttribute('href'));
+        if(t){ e.preventDefault(); t.scrollIntoView({behavior:'smooth', block:'start'}); }
       });
     });
   });
