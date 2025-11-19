@@ -2,31 +2,50 @@
 
 namespace App\Http\Controllers;
 
-use App\Mail\NewsletterConfirmMail;
 use App\Models\NewsletterSubscriber;
+use App\Services\Brevo;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Mail;
 
 class NewsletterController extends Controller
 {
     public function subscribe(Request $r)
     {
         $data = $r->validate([
-            'email' => 'required|email',
-            'name'  => 'nullable|string|max:150'
+            'email' => ['required', 'email'],
+            'name'  => ['nullable', 'string', 'max:150'],
         ]);
 
         $sub = NewsletterSubscriber::firstOrCreate(
             ['email' => strtolower($data['email'])],
-            ['name' => $data['name'] ?? null, 'status' => 'pending']
+            ['name'  => $data['name'] ?? null, 'status' => 'pending']
         );
 
+        // Asegura token por si el registro previo no lo tenía
+        if (empty($sub->token)) {
+            $sub->token = bin2hex(random_bytes(20));
+            $sub->save();
+        }
+
         if ($sub->status !== 'subscribed') {
-            Mail::to($sub->email)->queue(new NewsletterConfirmMail($sub));
+            $confirmUrl = route('newsletter.confirm', $sub->token); // <-- FALTABA
+            $html = view('emails.newsletter.confirm', [
+                'sub'        => $sub,
+                'confirmUrl' => $confirmUrl,
+            ])->render();
+
+            Brevo::send(
+                to: $sub->email,
+                subject: 'Confirma tu suscripción a APME',
+                html: $html,
+                fromEmail: config('mail.from.address', 'noticias@apme.bo'),
+                fromName: config('mail.from.name', 'APME'),
+                text: "Hola, confirma tu suscripción a APME:\n$confirmUrl\n\nSi no fuiste tú, ignora este mensaje.",
+                tags: ['newsletter', 'confirm']
+            );
         }
 
         return back()
-            ->withInput() // mantiene el email en el input del footer si recarga abajo
+            ->withInput()
             ->with('newsletter_ok', '¡Listo! Revisa tu correo para confirmar la suscripción.');
     }
 

@@ -39,115 +39,88 @@ class SendCampaignJob implements ShouldQueue
             return;
         }
 
-        // Solo pendientes
-        $queuedCount = CampaignRecipient::where('campaign_id', $campaign->id)
+        $queued = CampaignRecipient::where('campaign_id', $campaign->id)
             ->where('status', 'queued')
             ->count();
 
-        Log::info("[SendCampaignJob] Iniciando envío campaña={$campaign->id} queued={$queuedCount}");
+        Log::info("[SendCampaignJob] Iniciando envío campaña={$campaign->id} queued={$queued}");
 
-        if ($queuedCount === 0) {
+        if ($queued === 0) {
             $this->consolidateCampaign($campaign);
             return;
         }
 
-        $sentCount  = 0;
-        $errorCount = 0;
+        $plusSent = 0;
+        $plusErr  = 0;
 
-        // Envía en chunks para evitar cargar todo en memoria
         CampaignRecipient::where('campaign_id', $campaign->id)
             ->where('status', 'queued')
             ->orderBy('id')
-            ->chunkById(100, function ($chunk) use ($campaign, &$sentCount, &$errorCount) {
+            ->chunkById(100, function ($chunk) use ($campaign, &$plusSent, &$plusErr) {
                 foreach ($chunk as $r) {
-                    /** @var \App\Models\CampaignRecipient $r */
                     Log::info("[SendCampaignJob] Enviando a {$r->email} (recipient_id={$r->id})");
 
                     try {
-                        // ENVIAR por API (sin SMTP)
                         $ok = Brevo::send(
                             to: $r->email,
                             subject: $campaign->subject,
                             html: $campaign->html,
-                            fromEmail: config('mail.from.address'),
-                            fromName: config('mail.from.name')
+                            fromEmail: config('mail.from.address', 'noticias@apme.bo'),
+                            fromName: config('mail.from.name', 'APME'),
+                            text: strip_tags($campaign->html),
+                            tags: ['newsletter', 'campaign:' . $campaign->id]
                         );
 
                         if ($ok === true) {
-                            $r->update([
-                                'status'  => 'sent',
-                                'sent_at' => now(),
-                                'error'   => null,
-                            ]);
-                            $sentCount++;
+                            $r->update(['status' => 'sent', 'sent_at' => now(), 'error' => null]);
+                            $plusSent++;
                         } else {
-                            // $ok puede traer string con causa
-                            $r->update([
-                                'status' => 'failed',
-                                'error'  => is_string($ok) ? mb_substr($ok, 0, 500) : 'Brevo API send failed',
-                            ]);
-                            $errorCount++;
+                            $r->update(['status' => 'failed', 'error' => is_string($ok) ? mb_substr($ok, 0, 500) : 'Brevo API send failed']);
+                            $plusErr++;
                         }
 
-                        // respirito mínimo entre envíos para no trigggear rate limit agresivo
-                        usleep(120 * 1000); // 120ms
+                        usleep(120 * 1000); // 120ms anti rate limit
                     } catch (Throwable $e) {
-                        Log::error("[SendCampaignJob] Error enviando a {$r->email}: " . $e->getMessage());
-                        $r->update([
-                            'status' => 'failed',
-                            'error'  => mb_substr($e->getMessage(), 0, 500),
-                        ]);
-                        $errorCount++;
-
-                        // Si es rate-limit (429) o timeout, damos un respiro corto
+                        $r->update(['status' => 'failed', 'error' => mb_substr($e->getMessage(), 0, 500)]);
+                        $plusErr++;
                         if ($this->isRateLimitOrTimeout($e)) {
-                            usleep(800 * 1000); // 800ms
+                            usleep(800 * 1000);
                         }
+                        Log::error("[SendCampaignJob] Error enviando a {$r->email}: " . $e->getMessage());
                     }
                 }
             });
 
-        // Actualiza totales y estado final
         $this->consolidateCampaign($campaign);
 
-        Log::info("[SendCampaignJob] Final campaña={$campaign->id} sent+={$sentCount} errors+={$errorCount} " .
+        Log::info("[SendCampaignJob] Final campaña={$campaign->id} sent+={$plusSent} errors+={$plusErr} " .
             "total_sent={$campaign->sent_count} total_err={$campaign->error_count} status={$campaign->status}");
     }
 
     private function consolidateCampaign(Campaign $campaign): void
     {
-        $totalRecipients = CampaignRecipient::where('campaign_id', $campaign->id)->count();
-        $sent            = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'sent')->count();
-        $failed          = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'failed')->count();
-        $queuedLeft      = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'queued')->count();
+        $total  = CampaignRecipient::where('campaign_id', $campaign->id)->count();
+        $sent   = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'sent')->count();
+        $failed = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'failed')->count();
+        $left   = CampaignRecipient::where('campaign_id', $campaign->id)->where('status', 'queued')->count();
 
         $campaign->sent_count  = $sent;
         $campaign->error_count = $failed;
 
-        if ($queuedLeft > 0) {
-            $campaign->status = 'sending';
-        } elseif ($sent === 0 && $failed === 0) {
-            $campaign->status = 'empty';
-        } elseif ($sent === $totalRecipients) {
-            $campaign->status = 'sent';
-        } elseif ($sent > 0 && $failed > 0) {
-            $campaign->status = 'partial';
-        } else {
-            $campaign->status = 'failed';
-        }
+        $campaign->status = $left > 0
+            ? 'sending'
+            : ($sent === 0 && $failed === 0 ? 'empty'
+                : ($sent === $total ? 'sent'
+                    : ($sent > 0 && $failed > 0 ? 'partial' : 'failed')));
 
         $campaign->save();
 
-        Log::info("[SendCampaignJob] Consolidado campaña={$campaign->id} " .
-            "queued_left={$queuedLeft} sent={$sent} failed={$failed} total={$totalRecipients} status={$campaign->status}");
+        Log::info("[SendCampaignJob] Consolidado campaña={$campaign->id} queued_left={$left} sent={$sent} failed={$failed} total={$total} status={$campaign->status}");
     }
 
     private function isRateLimitOrTimeout(Throwable $e): bool
     {
-        $msg = strtolower($e->getMessage());
-        return str_contains($msg, '429') ||
-            str_contains($msg, 'rate limit') ||
-            str_contains($msg, 'timed out') ||
-            str_contains($msg, 'timeout');
+        $m = strtolower($e->getMessage());
+        return str_contains($m, '429') || str_contains($m, 'rate limit') || str_contains($m, 'timed out') || str_contains($m, 'timeout');
     }
 }
