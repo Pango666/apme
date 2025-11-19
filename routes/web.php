@@ -7,6 +7,7 @@ use App\Http\Controllers\{
     CommunityController,
     ProductController,
     AlbumController,
+    NewsletterController,
     PostController
 };
 use App\Http\Controllers\Admin\{
@@ -15,12 +16,19 @@ use App\Http\Controllers\Admin\{
     CommunityController as AdminCommunityController,
     ProductController as AdminProductController,
     AlbumController as AdminAlbumController,
+    CampaignController,
     PostController as AdminPostController,
-    PartnerController as AdminPartnerController
+    PartnerController as AdminPartnerController,
+    SubscriberController
 };
 
 // ------------------ PÚBLICO ------------------
 Route::get('/', HomeController::class)->name('home');
+
+// Newsletter
+Route::post('/newsletter/subscribe', [NewsletterController::class, 'subscribe'])->name('newsletter.subscribe');
+Route::get('/newsletter/confirm/{token}', [NewsletterController::class, 'confirm'])->name('newsletter.confirm');
+Route::get('/newsletter/unsubscribe/{token}', [NewsletterController::class, 'unsubscribe'])->name('newsletter.unsubscribe');
 
 // Páginas institucionales
 Route::get('/pages/{slug}', [PageController::class, 'show'])->name('page.show');
@@ -55,11 +63,11 @@ Route::view('/contacto', 'pages.contacto')->name('contacto');
 // -------- Arreglo Breeze: /dashboard -> /admin --------
 Route::get('/dashboard', function () {
     return redirect()->route('admin.dashboard');
-})->middleware(['auth','verified'])->name('dashboard');
+})->middleware(['auth', 'verified'])->name('dashboard');
 
 // ------------------ ADMIN (protegido) ------------------
 Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/', fn () => view('admin.dashboard'))->name('dashboard');
+    Route::get('/', fn() => view('admin.dashboard'))->name('dashboard');
 
     // Ajustes
     Route::get('settings', [AdminSettingController::class, 'index'])->name('settings.index');
@@ -72,6 +80,13 @@ Route::middleware(['auth'])->prefix('admin')->name('admin.')->group(function () 
     Route::resource('albums',      AdminAlbumController::class);
     Route::resource('posts',       AdminPostController::class);
     Route::resource('partners',    AdminPartnerController::class);
+
+    // Newsletter for Admin
+    Route::prefix('newsletter')->name('newsletter.')->group(function () {
+        Route::resource('subscribers', SubscriberController::class)->only(['index', 'destroy']);
+        Route::resource('campaigns',   CampaignController::class);
+        Route::post('campaigns/{campaign}/send-now', [CampaignController::class, 'sendNow'])->name('campaigns.send');
+    });
 });
 
-require __DIR__.'/auth.php';
+require __DIR__ . '/auth.php';

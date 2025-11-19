@@ -178,14 +178,34 @@
         </div>
 
         {{-- Boletín informativo --}}
-        <div>
-          <h3 class="font-semibold text-lg mb-4">Boletín Informativo</h3>
-          <p class="text-white/80 text-sm mb-4">Recibe noticias, eventos y novedades sobre apicultura sostenible.</p>
-          <form class="space-y-3">
-            <input class="w-full rounded-lg bg-white/10 text-white placeholder-white/60 px-4 py-3 outline-none focus:ring-2 ring-miel border border-white/20" type="email" placeholder="tu@correo.com" required>
-            <button class="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-miel to-ambar text-tinta font-semibold hover:shadow-md transition-all">Suscribirme</button>
-          </form>
-        </div>
+<div>
+  <h3 class="font-semibold text-lg mb-4">Boletín Informativo</h3>
+  <p class="text-white/80 text-sm mb-4">Recibe noticias, eventos y novedades sobre apicultura sostenible.</p>
+
+  <form class="space-y-3" method="POST" action="{{ route('newsletter.subscribe') }}">
+    @csrf
+    <input
+      class="w-full rounded-lg bg-white/10 text-white placeholder-white/60 px-4 py-3 outline-none focus:ring-2 ring-miel border border-white/20"
+      type="email"
+      name="email"
+      value="{{ old('email') }}"
+      placeholder="tu@correo.com"
+      required
+    >
+    <button class="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-miel to-ambar text-tinta font-semibold hover:shadow-md transition-all">
+      Suscribirme
+    </button>
+  </form>
+
+  {{-- mensajes --}}
+  @if(session('ok'))
+    <p class="mt-2 text-sm text-emerald-200">{{ session('ok') }}</p>
+  @endif
+
+  @error('email')
+    <p class="mt-2 text-sm text-rose-200">{{ $message }}</p>
+  @enderror
+</div>
       </div>
 
       {{-- Línea inferior --}}

@@ -94,6 +94,12 @@
       </div>
     @endif
 
+    {{-- Enviar al boletín al guardar --}}
+    <label class="inline-flex items-center gap-2 mt-4">
+      <input type="checkbox" name="send_to_newsletter" value="1">
+      Enviar al boletín al guardar
+    </label>
+
     <div class="mt-6">
       <button class="px-4 py-2 bg-borgo text-white rounded">Guardar</button>
       <a class="ml-3 underline" href="{{ route('admin.albums.index') }}">Volver</a>
